@@ -135,9 +135,39 @@ class ReadableMobileNetV1(nn.Module):
         return x
 
 
+class MobileNetV1(nn.Module):
+    def __init__(self, in_chan=3, classes=1000):
+        super(MobileNetV1, self).__init__()
+
+        self.cfg_pt1 = [(32,64,1), (64,128,2), (128,128,1), (128,256,2), (256,256,1), (256,512,2)]
+        self.cfg_pt2 = [(512,512,1) for i in range(5)]
+        self.cfg_pt3 = [(512,1024,2), (1024,1024,1)]
+        self.config = self.cfg_pt1 + self.cfg_pt2 + self.cfg_pt3
+
+        self.conv3x3bnrl = Conv3x3BnRelu(in_chan, 32, strd=2, pad=1)
+
+        self.conv_layer = nn.ModuleList()
+        for cfg in self.config:
+            self.conv_layer.append(DWConv3x3BnRelu(cfg[0], cfg[0], strd=cfg[2]))
+            self.conv_layer.append(Conv1x1BnRelu(cfg[0], cfg[1]))
+        self.conv_layer = nn.Sequential(*self.conv_layer)
+
+        self.avgpool = nn.AvgPool2d(kernel_size=7, stride=1)
+        self.flatten = Flatten()
+        self.fc = nn.Linear(1024, classes)
+
+    def forward(self, input):
+        x = self.conv3x3bnrl(input)
+        x = self.conv_layer(x)
+        x = self.avgpool(x)
+        x = self.flatten(x)
+        x = self.fc(x)
+        return x
+
+
 
 if __name__ == '__main__':
-    model = ReadableMobileNetV1(in_chan=3, classes=7)
+    model = MobileNetV1(in_chan=3, classes=7)
     input = torch.rand(1,3,224,224)
     output = model(input)
     print(output)
